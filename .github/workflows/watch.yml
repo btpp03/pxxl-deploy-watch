@@ -29,6 +29,8 @@ jobs:
       - name: Watch
         env:
           PXXL_REFRESH: ${{ secrets.PXXL_REFRESH }}
+          PXXL_CSRF: ${{ secrets.PXXL_CSRF }}
+          PXXL_SIGNUP_DEVICE: ${{ secrets.PXXL_SIGNUP_DEVICE }}
           PXXL_DEVICE_ID: ${{ secrets.PXXL_DEVICE_ID }}
           GH_PAT: ${{ secrets.GH_PAT }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}

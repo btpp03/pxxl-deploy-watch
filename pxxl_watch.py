@@ -21,6 +21,8 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "btpp03/pxxl-deploy-watch")
 STALE_HOURS = 12
 
 RT = os.environ.get("PXXL_REFRESH", "").strip()
+CSRF0 = os.environ.get("PXXL_CSRF", "").strip()
+SDEV = os.environ.get("PXXL_SIGNUP_DEVICE", "").strip()
 DEV = os.environ.get("PXXL_DEVICE_ID", "").strip()
 PAT = os.environ.get("GH_PAT", "").strip()
 TG_TOKEN = os.environ.get("TG_BOT_TOKEN", "").strip()
@@ -116,11 +118,16 @@ def main():
         return
 
     # 1) 刷新 token（会轮换 refresh token，立刻写回 secret）
-    st, hdrs, body = http("POST", f"{BASE}/auth/refresh-token", {}, {"Cookie": f"pxxl_refresh={RT}"})
+    cookie = f"pxxl_refresh={RT}; pxxl_csrf={CSRF0}"
+    if SDEV:
+        cookie += f"; pxxl_signup_device={SDEV}"
+    st, hdrs, body = http("POST", f"{BASE}/auth/refresh-token", {},
+                          {"Cookie": cookie, "X-CSRF-Token": CSRF0,
+                           "Origin": "https://app.pxxl.app",
+                           "Referer": "https://app.pxxl.app/"})
     log("refresh", st, body[:120])
     if st != 200:
-        notify(f"Pxxl 看门狗：refresh token 失效（HTTP {st}），需人工重新登录。")
-        return
+        raise SystemExit(1)
 
     access = cookie_val(hdrs, "pxxl_access") or ""
     refresh = cookie_val(hdrs, "pxxl_refresh") or ""
@@ -131,6 +138,8 @@ def main():
         pass
     if refresh and refresh != RT:
         put_secret("PXXL_REFRESH", refresh)
+    if csrf and csrf != CSRF0:
+        put_secret("PXXL_CSRF", csrf)
 
     ck = f"pxxl_access={access}; pxxl_refresh={refresh or RT}; pxxl_csrf={csrf}"
     hd = {"Cookie": ck, "Origin": "https://app.pxxl.app",
