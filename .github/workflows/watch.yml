@@ -1,0 +1,38 @@
+name: pxxl-deploy-watch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 */3 * * *'   # 备用腿（GA 原生 schedule 常不 fire，主腿是 cron-job.org）
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pxxl-deploy-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pynacl
+
+      - name: Watch
+        env:
+          PXXL_REFRESH: ${{ secrets.PXXL_REFRESH }}
+          PXXL_DEVICE_ID: ${{ secrets.PXXL_DEVICE_ID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          PXXL_PROJECT_ID: proj_5el66e524fbqjyro0hrw
+          PXXL_DOMAIN: https://btpp-test.pxxlspace.cv
+        run: python pxxl_watch.py
