@@ -6,7 +6,7 @@ Pxxl（pxxl.app）免费层部署看门狗。免费用户被锁在 `rgn_eu_centr
 ## 它在干什么
 
 1. 用 `PXXL_REFRESH` 刷新 access token（**refresh token 会轮换**，脚本刷新后立刻把新值写回 repo secret）
-2. 查 `proj_5el66e524fbqjyro0hrw` 的最新部署状态
+2. 查 `proj_mr0fjlq6xdxaeodfcvqe` 的最新部署状态（2026-11-17 换探针镜像后重建，ID 变了）
 3. 部署 `running` → 请求 `https://btpp-test.pxxlspace.cv`，HTTP 2xx 就推 TG 并置变量 `PXXL_DONE=1`（之后自动静默）
 4. 部署 `failed` 或排队超过 12 小时 → 调 `POST /projects/{id}/redeploy` 重新排一次
 5. 其它情况（还在排队）→ 只写日志，不打扰

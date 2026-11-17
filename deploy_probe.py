@@ -21,7 +21,7 @@ import time
 import pxxl_watch as w
 
 BASE = w.BASE
-PROJ = os.environ.get("PXXL_PROJECT_ID", "proj_5el66e524fbqjyro0hrw")
+PROJ = os.environ.get("PXXL_PROJECT_ID", "proj_mr0fjlq6xdxaeodfcvqe")
 DOMAIN = os.environ.get("PXXL_DOMAIN", "https://btpp-test.pxxlspace.cv")
 IMG = os.environ.get("PROBE_IMAGE", "ghcr.io/btpp03/pxxl-probe-image:latest")
 PLACEHOLDER = "docker.io/library/nginx:alpine"

@@ -38,7 +38,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           NZ_CLIENT_SECRET: ${{ secrets.NZ_CLIENT_SECRET }}
           NZ_SERVER: nezhav2.btppone.hidns.vip
-          PXXL_PROJECT_ID: proj_5el66e524fbqjyro0hrw
+          PXXL_PROJECT_ID: proj_mr0fjlq6xdxaeodfcvqe
           PXXL_DOMAIN: https://btpp-test.pxxlspace.cv
           PROBE_IMAGE: ghcr.io/btpp03/pxxl-probe-image:latest
           PROBE_ONLY: ${{ inputs.probe_only && '1' || '0' }}

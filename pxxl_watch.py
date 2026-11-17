@@ -15,7 +15,7 @@ import urllib.request
 BASE = "https://server.pxxl.app/api/v3"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-PROJ = os.environ.get("PXXL_PROJECT_ID", "proj_5el66e524fbqjyro0hrw")
+PROJ = os.environ.get("PXXL_PROJECT_ID", "proj_mr0fjlq6xdxaeodfcvqe")
 DOMAIN = os.environ.get("PXXL_DOMAIN", "https://btpp-test.pxxlspace.cv")
 REPO = os.environ.get("GITHUB_REPOSITORY", "btpp03/pxxl-deploy-watch")
 STALE_HOURS = 12
