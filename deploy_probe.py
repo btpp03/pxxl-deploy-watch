@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""One-shot: deploy the Nezha probe to Pxxl.
+"""Replace the placeholder btpp-test project with the Nezha probe, safely.
 
-Pxxl has no API to change the image of an existing docker-image project, and
-SpaceDrop on Free only accepts HTML/PHP. The only working image path is
-POST /projects/create/docker-image, which creates a new project `btpp-probe`.
-Nothing is deleted; btpp-test is left untouched.
+Pxxl Free allows exactly 1 web service project and has no API to change an
+existing docker-image project's image. So: verify the free CPU pool, delete the
+nginx placeholder, immediately re-create a project with the SAME name/domain
+pointing at the probe image, push env vars, and verify end to end.
+
+Safety:
+  * PROBE_ONLY=1 -> read capacity only, change nothing.
+  * CPU gate: recommended region must have >= 0.5 free vCPU before deleting.
+  * Rollback: if create fails, re-create the original nginx:alpine placeholder.
+  * Delete and create run back-to-back in one GA job.
 
 Run from GitHub Actions (workflow_dispatch). Never prints secret values.
 """
@@ -18,6 +24,7 @@ BASE = w.BASE
 PROJ = os.environ.get("PXXL_PROJECT_ID", "proj_5el66e524fbqjyro0hrw")
 DOMAIN = os.environ.get("PXXL_DOMAIN", "https://btpp-test.pxxlspace.cv")
 IMG = os.environ.get("PROBE_IMAGE", "ghcr.io/btpp03/pxxl-probe-image:latest")
+PLACEHOLDER = "docker.io/library/nginx:alpine"
 SECRET = os.environ.get("NZ_CLIENT_SECRET", "").strip()
 SERVER = os.environ.get("NZ_SERVER", "nezhav2.btppone.hidns.vip").strip()
 DEV = os.environ.get("PXXL_DEVICE_ID", "").strip()
@@ -59,6 +66,49 @@ def brief(b, n=420):
     return b[:n].replace("\n", " ")
 
 
+def capacity(hd):
+    st, _, b = w.http("GET", BASE + "/runtime-regions", headers=hd)
+    log("REGIONS-HTTP", st)
+    rid, cpu, mem = None, 0.0, 0
+    if st == 200:
+        try:
+            d = json.loads(b)
+            rid = d.get("recommendedRegionId")
+            log("RECOMMENDED", rid)
+            for r in d.get("regions", []):
+                log("REGION", r.get("id"), r.get("location"),
+                    "avail=", r.get("availabilityStatus"),
+                    "cpuFree=", r.get("freeCpuCores"),
+                    "memFreeMb=", r.get("freeMemoryMb"),
+                    "healthy=", r.get("healthyServers"), "/", r.get("totalServers"))
+                if r.get("id") == rid:
+                    cpu = float(r.get("freeCpuCores") or 0)
+                    mem = int(r.get("freeMemoryMb") or 0)
+        except Exception as e:
+            log("REGIONS parse", repr(e), brief(b, 400))
+    else:
+        log("REGIONS body", brief(b, 400))
+    return rid, cpu, mem
+
+
+def create(hd, image, rid):
+    payload = {
+        "name": "btpp-test",
+        "dockerImage": image,
+        "env": "",
+        "port": "80",
+        "environment": "production",
+        "label": "Work",
+        "domainChoice": "pxxlspace.cv",
+        "teamId": None,
+    }
+    if rid:
+        payload["regionId"] = rid
+    st, _, b = w.http("POST", BASE + "/projects/create/docker-image", payload, hd)
+    log("CREATE", st, brief(b, 700))
+    return st, b
+
+
 def push_envs(hd, project_id):
     vars_ = [
         {"key": "NZ_SERVER", "value": SERVER, "isSecret": False},
@@ -75,88 +125,47 @@ def main():
         raise SystemExit("NZ_CLIENT_SECRET missing")
     hd = session()
 
-    # Capacity probe: the free tier's eu_central pool is often CPU-starved,
-    # which is exactly why the original deploy sat in `queued` and then failed.
-    st, _, b = w.http("GET", BASE + "/runtime-regions", headers=hd)
-    log("REGIONS-HTTP", st)
-    if st == 200:
-        try:
-            d = json.loads(b)
-            log("RECOMMENDED", d.get("recommendedRegionId"))
-            for r in d.get("regions", []):
-                log("REGION", r.get("id"), r.get("location"),
-                    "avail=", r.get("availabilityStatus"),
-                    "cpuFree=", r.get("freeCpuCores"),
-                    "memFreeMb=", r.get("freeMemoryMb"),
-                    "healthy=", r.get("healthyServers"), "/", r.get("totalServers"))
-        except Exception as e:
-            log("REGIONS parse", repr(e), brief(b, 400))
-    else:
-        log("REGIONS body", brief(b, 400))
+    rid, cpu, mem = capacity(hd)
+    log("GATE", "region=", rid, "cpuFree=", cpu, "memFreeMb=", mem)
     if os.environ.get("PROBE_ONLY") == "1":
         log("PROBE-ONLY: capacity read, no project deleted or created")
         return
+    if cpu < 0.5:
+        log("GATE-BLOCK: no free CPU in the recommended region; nothing deleted")
+        return
 
-    st, _, b = w.http("GET", BASE + f"/cli/projects/{PROJ}", headers=hd)
-    log("BASELINE", st, brief(b))
-    old_url = ""
-    try:
-        old_url = json.loads(b)["project"]["githubUrl"]
-    except Exception:
-        pass
+    # 1) release the only web-service slot
+    st, _, b = w.http("DELETE", BASE + f"/cli/projects/{PROJ}", None, hd)
+    log("DELETE", st, brief(b, 300))
+    if st not in (200, 204):
+        st, _, b = w.http("DELETE", BASE + f"/projects/{PROJ}", None, hd)
+        log("DELETE-alt", st, brief(b, 300))
+    if st not in (200, 204):
+        log("DELETE-FAILED: aborting, old project untouched")
+        return
 
-    # Free users cannot pick a region; follow the recommended one.
-    rid = None
-    st, _, b = w.http("GET", BASE + "/runtime-regions", headers=hd)
-    if st == 200:
-        try:
-            rid = json.loads(b).get("recommendedRegionId")
-        except Exception:
-            pass
-    log("RECOMMENDED-REGION", rid)
-
-    payload = {
-        "name": "btpp-probe",
-        "dockerImage": IMG,
-        "env": "",
-        "port": "80",
-        "environment": "production",
-        "label": "Work",
-        "domainChoice": "pxxlspace.cv",
-        "teamId": None,
-    }
-    if rid:
-        payload["regionId"] = rid
-
-    st, _, b = w.http("POST", BASE + "/projects/create/docker-image", payload, hd)
-    log("CREATE", st, brief(b, 700))
+    # 2) immediately re-create with the same name/domain
+    st, b = create(hd, IMG, rid)
     if st not in (200, 201):
-        log("CREATE-FAILED: no project created, nothing else changed")
+        st2, b2 = create(hd, PLACEHOLDER, rid)
+        log("ROLLBACK", st2, brief(b2, 400))
+        log("RESTORE-RESULT", "original nginx placeholder restored"
+            if st2 in (200, 201) else "RESTORE FAILED - check dashboard manually")
         return
 
     target, domain = PROJ, DOMAIN
     try:
         d = json.loads(b)
-        new_id = d.get("projectId") or (d.get("project") or {}).get("id")
-        new_domain = d.get("domainName")
-        if new_id and new_id != PROJ:
-            target, domain = new_id, "https://" + new_domain
-        log("TARGET", target, domain)
+        target = d.get("projectId") or (d.get("project") or {}).get("id") or PROJ
+        dn = d.get("domainName")
+        if dn:
+            domain = "https://" + dn
     except Exception as e:
         log("CREATE parse", repr(e))
-
-    # Did projectId replace the old image in place?
-    st2, _, b2 = w.http("GET", BASE + f"/cli/projects/{PROJ}", headers=hd)
-    try:
-        now_url = json.loads(b2)["project"]["githubUrl"]
-    except Exception:
-        now_url = ""
-    log("OLD-PROJECT-IMAGE", old_url, "->", now_url)
-    if target == PROJ and IMG not in now_url:
-        log("NOTE projectId was ignored on the existing project; treating as new project")
+    log("NEW-PROJECT-ID", target, "DOMAIN", domain)
     push_envs(hd, target)
 
-    # The old image serves the nginx welcome page; ours serves a plain "ok".
+    # The old image served the nginx welcome page; ours serves a plain "ok".
     for i in range(12):
         time.sleep(20)
         st, _, b = w.http("GET", BASE + "/deployments?limit=8", headers=hd)
@@ -175,7 +184,7 @@ def main():
         st2, _, txt = w.http("GET", domain, timeout=25)
         log("DOMAIN", i, st2, brief(txt, 100))
         if st2 == 200 and "Welcome to nginx" not in txt:
-            log("PROBE-LIVE: response is not the nginx default page")
+            log("PROBE-LIVE: response is no longer the nginx default page")
             break
 
     st, _, b = w.http("GET", BASE + f"/cli/projects/{target}/live-logs?tail=80", headers=hd)
