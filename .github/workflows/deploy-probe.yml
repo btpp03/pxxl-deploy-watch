@@ -1,0 +1,39 @@
+name: deploy-probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pxxl-deploy-watch
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pynacl
+
+      - name: Switch project to probe image and verify
+        env:
+          PXXL_REFRESH: ${{ secrets.PXXL_REFRESH }}
+          PXXL_CSRF: ${{ secrets.PXXL_CSRF }}
+          PXXL_SIGNUP_DEVICE: ${{ secrets.PXXL_SIGNUP_DEVICE }}
+          PXXL_DEVICE_ID: ${{ secrets.PXXL_DEVICE_ID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          NZ_CLIENT_SECRET: ${{ secrets.NZ_CLIENT_SECRET }}
+          NZ_SERVER: nezhav2.btppone.hidns.vip
+          PXXL_PROJECT_ID: proj_5el66e524fbqjyro0hrw
+          PXXL_DOMAIN: https://btpp-test.pxxlspace.cv
+          PROBE_IMAGE: ghcr.io/btpp03/pxxl-probe-image:latest
+        run: python deploy_probe.py
