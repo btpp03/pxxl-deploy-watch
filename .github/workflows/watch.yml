@@ -35,6 +35,6 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          PXXL_PROJECT_ID: proj_5el66e524fbqjyro0hrw
+          PXXL_PROJECT_ID: proj_mr0fjlq6xdxaeodfcvqe
           PXXL_DOMAIN: https://btpp-test.pxxlspace.cv
         run: python pxxl_watch.py
