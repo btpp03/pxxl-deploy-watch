@@ -15,6 +15,7 @@ BASE = w.BASE
 PROJ = os.environ.get("PXXL_PROJECT_ID", "proj_5el66e524fbqjyro0hrw")
 DOMAIN = os.environ.get("PXXL_DOMAIN", "https://btpp-test.pxxlspace.cv")
 IMG = os.environ.get("PROBE_IMAGE", "ghcr.io/btpp03/pxxl-probe-image:latest")
+NEW_URL = "pxxl://images/prebuilt/" + IMG
 SECRET = os.environ.get("NZ_CLIENT_SECRET", "").strip()
 SERVER = os.environ.get("NZ_SERVER", "nezhav2.btppone.hidns.vip").strip()
 DEV = os.environ.get("PXXL_DEVICE_ID", "").strip()
@@ -82,13 +83,14 @@ def main():
 
     # Which endpoint actually changes the image of an existing project?
     candidates = [
-        ("PUT", f"/cli/projects/{PROJ}", {"dockerImage": IMG}),
-        ("PUT", f"/projects/{PROJ}", {"dockerImage": IMG}),
-        ("PATCH", f"/cli/projects/{PROJ}", {"dockerImage": IMG}),
-        ("POST", f"/projects/{PROJ}/source", {"dockerImage": IMG}),
-        ("PUT", f"/projects/{PROJ}/source", {"dockerImage": IMG}),
-        ("POST", f"/projects/{PROJ}/deploy", {"dockerImage": IMG}),
-        ("POST", f"/projects/{PROJ}/docker-image", {"dockerImage": IMG}),
+        ("PUT", f"/cli/projects/{PROJ}", {"githubUrl": NEW_URL}),
+        ("PUT", f"/projects/{PROJ}", {"githubUrl": NEW_URL}),
+        ("PUT", f"/cli/projects/{PROJ}", {"githubUrl": IMG}),
+        ("PUT", f"/cli/projects/{PROJ}", {"githubUrl": NEW_URL, "dockerImage": IMG, "port": 80}),
+        ("POST", f"/projects/{PROJ}/deployments", {"dockerImage": IMG}),
+        ("POST", "/deployments", {"projectId": PROJ, "dockerImage": IMG}),
+        ("PUT", f"/projects/{PROJ}/image", {"dockerImage": IMG}),
+        ("POST", f"/projects/{PROJ}/update-image", {"dockerImage": IMG}),
     ]
     applied_via = None
     for method, path, body in candidates:
@@ -96,7 +98,7 @@ def main():
         log("SET-IMAGE", method, path, st, brief(b, 260))
         st2, _, b2 = w.http("GET", BASE + f"/cli/projects/{PROJ}", headers=hd)
         log("  GET-after", st2, brief(b2, 420))
-        if st in (200, 201, 204):
+        if st in (200, 201, 204) and (IMG in b2 or NEW_URL in b2):
             applied_via = (method, path)
             break
     if not applied_via:
