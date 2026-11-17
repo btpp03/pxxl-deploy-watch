@@ -3,9 +3,8 @@
 
 Pxxl has no API to change the image of an existing docker-image project, and
 SpaceDrop on Free only accepts HTML/PHP. The only working image path is
-POST /projects/create/docker-image. We first pass `projectId` in case the
-server replaces the existing project in place; if it is ignored, a new project
-`btpp-probe` is created. Nothing is deleted.
+POST /projects/create/docker-image, which creates a new project `btpp-probe`.
+Nothing is deleted; btpp-test is left untouched.
 
 Run from GitHub Actions (workflow_dispatch). Never prints secret values.
 """
@@ -98,12 +97,11 @@ def main():
         "name": "btpp-probe",
         "dockerImage": IMG,
         "env": "",
-        "port": 80,
+        "port": "80",
         "environment": "production",
         "label": "Work",
         "domainChoice": "pxxlspace.cv",
         "teamId": None,
-        "projectId": PROJ,  # in-place replacement, if the server honours it
     }
     if rid:
         payload["regionId"] = rid
