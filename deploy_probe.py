@@ -75,6 +75,28 @@ def main():
         raise SystemExit("NZ_CLIENT_SECRET missing")
     hd = session()
 
+    # Capacity probe: the free tier's eu_central pool is often CPU-starved,
+    # which is exactly why the original deploy sat in `queued` and then failed.
+    st, _, b = w.http("GET", BASE + "/runtime-regions", headers=hd)
+    log("REGIONS-HTTP", st)
+    if st == 200:
+        try:
+            d = json.loads(b)
+            log("RECOMMENDED", d.get("recommendedRegionId"))
+            for r in d.get("regions", []):
+                log("REGION", r.get("id"), r.get("location"),
+                    "avail=", r.get("availabilityStatus"),
+                    "cpuFree=", r.get("freeCpuCores"),
+                    "memFreeMb=", r.get("freeMemoryMb"),
+                    "healthy=", r.get("healthyServers"), "/", r.get("totalServers"))
+        except Exception as e:
+            log("REGIONS parse", repr(e), brief(b, 400))
+    else:
+        log("REGIONS body", brief(b, 400))
+    if os.environ.get("PROBE_ONLY") == "1":
+        log("PROBE-ONLY: capacity read, no project deleted or created")
+        return
+
     st, _, b = w.http("GET", BASE + f"/cli/projects/{PROJ}", headers=hd)
     log("BASELINE", st, brief(b))
     old_url = ""
