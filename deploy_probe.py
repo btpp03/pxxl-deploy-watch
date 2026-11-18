@@ -128,7 +128,16 @@ def main():
     rid, cpu, mem = capacity(hd)
     log("GATE", "region=", rid, "cpuFree=", cpu, "memFreeMb=", mem)
     if os.environ.get("PROBE_ONLY") == "1":
-        log("PROBE-ONLY: capacity read, no project deleted or created")
+        for p in (f"/cli/projects/{PROJ}", f"/projects/{PROJ}"):
+            st, _, b = w.http("GET", BASE + p, headers=hd)
+            log("STATE", p, st, brief(b, 1000))
+        st, _, b = w.http("GET", BASE + "/deployments?limit=8", headers=hd)
+        log("DEPLOYMENTS", st, brief(b, 800))
+        st, _, b = w.http("GET", BASE + f"/cli/projects/{PROJ}/runtime-diagnostics", headers=hd)
+        log("DIAG", st, brief(b, 800))
+        st, _, b = w.http("GET", BASE + f"/cli/projects/{PROJ}/live-logs?tail=60", headers=hd)
+        log("LIVE-LOGS", st, brief(b, 1400))
+        log("PROBE-ONLY: state read, nothing changed")
         return
     if cpu < 0.5:
         log("GATE-BLOCK: no free CPU in the recommended region; nothing deleted")
