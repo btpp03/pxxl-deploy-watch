@@ -120,10 +120,35 @@ def push_envs(hd, project_id):
     return st in (200, 201)
 
 
+def revive(hd):
+    """Restart a stopped deployment and poll until the domain answers again."""
+    for path in (f"/cli/projects/{PROJ}/restart", f"/projects/{PROJ}/restart"):
+        st, _, b = w.http("POST", BASE + path, {}, hd)
+        log("RESTART", path, st, brief(b, 300))
+        if st in (200, 201):
+            break
+    for i in range(9):
+        time.sleep(20)
+        st, _, b = w.http("GET", BASE + f"/projects/{PROJ}/live-status", headers=hd)
+        log("LIVE-STATUS", i, st, brief(b, 300))
+        st2, _, txt = w.http("GET", DOMAIN, timeout=20)
+        log("DOMAIN", i, st2, brief(txt, 80))
+        if st2 == 200:
+            log("REVIVED: domain answering again")
+            st, _, b = w.http("GET", BASE + f"/cli/projects/{PROJ}/live-logs?tail=60", headers=hd)
+            log("LIVE-LOGS", st, brief(b, 1200))
+            return
+    log("REVIVE-FAILED: still not serving; a redeploy may be needed")
+
+
 def main():
     if not SECRET:
         raise SystemExit("NZ_CLIENT_SECRET missing")
     hd = session()
+
+    if os.environ.get("ACTION") == "restart":
+        revive(hd)
+        return
 
     rid, cpu, mem = capacity(hd)
     log("GATE", "region=", rid, "cpuFree=", cpu, "memFreeMb=", mem)

@@ -7,6 +7,10 @@ on:
         description: 'Only read runtime-region capacity (no delete/create)'
         type: boolean
         default: true
+      action:
+        description: 'restart = revive the stopped deployment only'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -42,4 +46,5 @@ jobs:
           PXXL_DOMAIN: https://btpp-test.pxxlspace.cv
           PROBE_IMAGE: ghcr.io/btpp03/pxxl-probe-image:latest
           PROBE_ONLY: ${{ inputs.probe_only && '1' || '0' }}
+          ACTION: ${{ inputs.action }}
         run: python deploy_probe.py
